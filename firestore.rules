@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    // The shop owner (admin panel). Keep in sync with ownerEmail in admin_panel/lib/config.dart
+    function isAdmin() {
+      return verified() && request.auth.token.email.lower() == 'saruarhossain778620@gmail.com';
+    }
+
+    // Each user manages their own profile; the admin can see every profile
+    match /users/{userId} {
+      allow read: if (signedIn() && request.auth.uid == userId) || isAdmin();
+      allow create, update, delete: if signedIn() && request.auth.uid == userId;
+    }
+
+    // Everyone can see products; only the admin can add, edit or delete them
+    match /Products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Verified users place and see their own orders; the admin sees and manages all orders
+    match /Orders/{orderId} {
+      allow create: if verified() && request.resource.data.UserId == request.auth.uid;
+      allow read: if (signedIn() && resource.data.UserId == request.auth.uid) || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+  }
+}
